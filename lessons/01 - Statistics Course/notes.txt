@@ -1,0 +1,13 @@
+** Correlation does not imply causation. **
+
+
+
+Survey downsides:
+* Biased answers
+* Repsonse bias
+* Non-response bias
+
+Coding:
+* Anaconda distribution of Python
+* jupyter notebooks formerly known as ipython notebooks
+

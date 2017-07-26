@@ -1,0 +1,487 @@
+#LyX 2.1 created this file. For more info see http://www.lyx.org/
+\lyxformat 474
+\begin_document
+\begin_header
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_math auto
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Test a Perceptual Phenomenon
+\end_layout
+
+\begin_layout Author
+Jonas Sternisko
+\end_layout
+
+\begin_layout Paragraph
+1
+\end_layout
+
+\begin_layout Standard
+The independent variable is the 
+\emph on
+condition
+\emph default
+, to which participants are exposed.
+ This can be either the 
+\emph on
+congruent words condition 
+\begin_inset Formula $C$
+\end_inset
+
+ 
+\emph default
+or the 
+\emph on
+incongruent words condition
+\emph default
+ 
+\begin_inset Formula $I$
+\end_inset
+
+.
+ The dependent variable is the 
+\emph on
+time
+\emph default
+ it takes the participant 
+\emph on
+to name the ink color
+\emph default
+ for all the words in the corresponding set.
+ Let 
+\begin_inset Formula $t_{C}$
+\end_inset
+
+ and 
+\begin_inset Formula $t_{I}$
+\end_inset
+
+ denote the time to solve the words of the respective condition.
+\end_layout
+
+\begin_layout Paragraph*
+2
+\end_layout
+
+\begin_layout Standard
+Let 
+\begin_inset Formula $\mu_{C}$
+\end_inset
+
+ and 
+\begin_inset Formula $\mu_{I}$
+\end_inset
+
+ denote the means of the solution times for the population of the respective
+ condition 
+\begin_inset Formula $U_{C}$
+\end_inset
+
+ and 
+\begin_inset Formula $U_{I}$
+\end_inset
+
+.
+ The null hypothesis 
+\begin_inset Formula $H_{0}$
+\end_inset
+
+ is that the average times to solve either problem set are equal, and the
+ alternative hypothesis 
+\begin_inset Formula $H_{A}$
+\end_inset
+
+ is that they are not.
+ 
+\begin_inset Formula 
+\begin{eqnarray*}
+H_{0} & : & \mu_{C}=\mu_{I}\\
+H_{A} & : & \mu_{C}\not=\mu_{I}
+\end{eqnarray*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+A 
+\begin_inset Formula $t$
+\end_inset
+
+-test is appropriate here, because the standard deviation 
+\begin_inset Formula $\sigma$
+\end_inset
+
+ of the population is unknown and the sample size is below 30 (http://www.statist
+icshowto.com/when-to-use-a-t-score-vs-z-score/).
+ We want to test if the sample means are different because the population
+ means are different, or just by chance.
+ It is a dependent 
+\begin_inset Formula $t$
+\end_inset
+
+-test, because the same subject is tested in two different conditions.
+ 
+\end_layout
+
+\begin_layout Paragraph*
+3
+\end_layout
+
+\begin_layout Standard
+Let 
+\begin_inset Formula $\bar{x}_{C}$
+\end_inset
+
+ and 
+\begin_inset Formula $\bar{x}_{I}$
+\end_inset
+
+ denote the sample means, i.e.
+ the average time it took the subjects from the table to complete either
+ condition.
+ For the given dataset we have 
+\begin_inset Formula $\bar{x}_{C}=14.051$
+\end_inset
+
+ and 
+\begin_inset Formula $\bar{x}_{I}=22.016$
+\end_inset
+
+.
+ The standard deviation for each condition are 
+\begin_inset Formula $\sigma_{C}=3.559$
+\end_inset
+
+ and 
+\begin_inset Formula $\sigma_{I}=4.797$
+\end_inset
+
+.
+ Other measures of central tendency (e.g.
+ median, mode) or variability (variance) are not needed for the test we
+ are going to conduct.
+\end_layout
+
+\begin_layout Paragraph
+4
+\end_layout
+
+\begin_layout Standard
+Lets have a look into the histogram.
+ We start with the congruent words condition:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Graphics
+	filename histogram_congruent.png
+	scale 50
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+We can see that it the participants between 7.5 and 22.5 seconds to read out
+ loud the words of this condition.
+ Most of the subjects spent between 10.0 and 12.5 seconds on the task (considering
+ the resolution of this plot).
+ From the shape of the graph it looks as if the 
+\begin_inset Formula $t_{C}$
+\end_inset
+
+ are approximately normal distributed.
+\end_layout
+
+\begin_layout Standard
+Next we compare with the histogram for the second condition:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Graphics
+	filename histogram_incongruent.png
+	scale 50
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Here, the participants took between 12.0 and 36.0 seconds (again, this is
+ imprecise because of the histogram bucket size).
+ The mode lies somewhere between 20.0 and 24.0 seconds.
+ Again, this looks approximately normal distributed, although it is not
+ sure given the small number of ten samples.
+\end_layout
+
+\begin_layout Standard
+Clearly the two histograms are centered around the different averages of
+ the samples.
+\end_layout
+
+\begin_layout Paragraph*
+5
+\end_layout
+
+\begin_layout Standard
+To conduct the 
+\begin_inset Formula $t$
+\end_inset
+
+-test for paired samples, we define the pairwise difference of samples as
+ 
+\begin_inset Formula $D_{i}=t_{I,i}-t_{C,i}$
+\end_inset
+
+.
+ From the dataset we get the average difference 
+\begin_inset Formula $\bar{D}=7.965$
+\end_inset
+
+.
+ There are 
+\begin_inset Formula $n=24$
+\end_inset
+
+ samples and thus 23 degrees of freedom.
+ We get our 
+\begin_inset Formula $t$
+\end_inset
+
+ from 
+\begin_inset Formula 
+\[
+t=\frac{\bar{D}}{s/\sqrt{n}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+where 
+\begin_inset Formula $s$
+\end_inset
+
+ is the sample standard deviation of the 
+\begin_inset Formula $D_{i}$
+\end_inset
+
+:
+\begin_inset Formula 
+\[
+s=\sqrt{\frac{\sum(D_{i}-\bar{D})^{2}}{n-1}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+In our dataset we have 
+\begin_inset Formula $s=4.865$
+\end_inset
+
+.
+ Thus, we get 
+\begin_inset Formula 
+\[
+t=\frac{7.965}{4.865/\sqrt{24}}=8.02
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Using the 
+\begin_inset Formula $t$
+\end_inset
+
+-table (with 23 degrees of freedom) we get a probability 
+\begin_inset Formula $p<0.0005$
+\end_inset
+
+.
+ With a confidence level of 99.9% we can say that the sample means are not
+ different by chance, but means of the two populations, 
+\begin_inset Formula $\mu_{C}$
+\end_inset
+
+ and 
+\begin_inset Formula $\mu_{I}$
+\end_inset
+
+ cannot not equal.
+ Thus, we have to reject the null.
+ 
+\end_layout
+
+\begin_layout Standard
+Personally, before doing the Stroop task I expected that the subjects (and
+ I myself) will perform slower on the condition of incongruent words.
+ However, I was surprised that the difference is so significant even with
+ such a small number of participants.
+\end_layout
+
+\begin_layout Paragraph
+6
+\end_layout
+
+\begin_layout Standard
+I think the observed difference is caused by they way the human brain processes
+ information.
+ In the case of the Stroop effect each word comes with two interfering pieces
+ of information: The meaning of the word and the ink color.
+ The brain translates the input into a spoken word (the color of the ink).
+ If the word's meaning and ink color are congruent, there is less 
+\begin_inset Quotes eld
+\end_inset
+
+processing
+\begin_inset Quotes erd
+\end_inset
+
+ involved.
+ However, if the two are incongruent, the brain takes more effort to process
+ the information and focus on the relevant part (the ink color).
+ 
+\end_layout
+
+\begin_layout Standard
+According to Wikipedia (https://en.wikipedia.org/wiki/Stroop_effect) the 
+\begin_inset Quotes eld
+\end_inset
+
+pieces of information
+\begin_inset Quotes erd
+\end_inset
+
+ are called stimuli.
+ I guess that the brain can be trained to this task in a way that the stimulus
+ of the word's meaning is ignored or forgotten, so to say.
+ One could consider it the other way around: if the subject does not know
+ the meaning of the word (e.g.
+ a person that does not speak English), it will not be distracted by the
+ conflicting stimulus.
+ 
+\end_layout
+
+\begin_layout Standard
+A similar task I can think of would use digits and repetition numbers as
+ stimuli: The subject would be presented with two sets of numbers consisting,
+ where each number consists of one repeated digit from 1 until 9.
+ The task is to name speak out loud the number of repetitions.
+ In the congruent set, the number of repetitions and the actual digit coincide,
+ for example 
+\begin_inset Quotes eld
+\end_inset
+
+22
+\begin_inset Quotes erd
+\end_inset
+
+ and 
+\begin_inset Quotes eld
+\end_inset
+
+55555
+\begin_inset Quotes erd
+\end_inset
+
+, whereas in the second condition they are incongruent: 
+\begin_inset Quotes eld
+\end_inset
+
+444
+\begin_inset Quotes erd
+\end_inset
+
+ and 
+\begin_inset Quotes eld
+\end_inset
+
+77
+\begin_inset Quotes erd
+\end_inset
+
+.
+ Like in the Stroop task, each subject would be presented a set of such
+ numbers from each condition and the time to solve the task would be measured.
+ I guess that in this experiment a similar interference of stimuli could
+ be observed.
+\end_layout
+
+\end_body
+\end_document
