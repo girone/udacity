@@ -1,0 +1,10 @@
+id,key,value,type
+258219703,highway,service,regular
+209809850,addr:housenumber,1412,addr
+209809850,addr:street,West Lexington St.,addr
+209809850,addr:street:name,Lexington,addr
+209809850,addr:street:prefix,West,addr
+209809850,addr:street:type,Street,addr
+209809850,building,yes,regular
+209809850,building:levels,1,building
+209809850,chicago:building_id,366409,chicago
