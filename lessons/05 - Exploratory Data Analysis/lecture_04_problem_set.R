@@ -80,6 +80,7 @@ library(tidyr)
 library(dplyr)
 library(grid)
 library(gridExtra)
+library(ggplot2)
 xl <- read_excel("indicator CDIAC carbon_dioxide_emissions_per_capita.xlsx")
 xl2 <- read_excel("energy use per person.xlsx")
 # Collapse year columns into one column for a variable "year" using tidyr's gather().
@@ -96,6 +97,7 @@ sapply(xl, class)
 sapply(xl2, mode)
 sapply(xl2, class)
 # We need to fix it to be able to do the join:
+# Alternative: Add "convert = TRUE" to gather() above.
 xl <- transform(xl, year = as.numeric(year))
 xl2 <- transform(xl2, year = as.numeric(year))
 
@@ -114,7 +116,10 @@ ggplot(data = data2010,
   ggtitle("Energy use and CO2 emission (2010)") +
   xlab("Energy use (tons of oil equivalent per capita)") +
   ylab("CO2 emission (tons of CO2 per capita)") +
-  geom_smooth(color = "red")
+  #geom_smooth(color = "red", level = 0.95, span = 10, method = "lm", formula = y ~ splines::bs(x, 3)) 
+  geom_smooth(color = "red", level = 0.99, span = 1, n = 10, method = "lm") 
+  #geom_smooth(color = "red", level = 0.95, span = 10) 
+              
 ggsave("energy_consumption_and_CO2_emission_per_capita.png")
 
 # Analysis:
