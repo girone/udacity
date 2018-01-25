@@ -18,9 +18,8 @@ output:
 # for other code chunks once you have verified that each plot comes out as you
 # want it to. This will clean up the flow of your report.
 
-#install.packages("knitr", dependencies = T)
-#install.packages("dplyr")
-#install.packages("tidyr")
+#install.packages("knitr", "plyr", "tidyr", "devtools", "cowplot", dependencies = T)
+
 
 library(ggplot2)
 library(knitr)
@@ -33,6 +32,15 @@ library(ggthemes)
 library(scales)
 library(grDevices)
 library(ggrepel)  # non-overlapping labels
+library(cowplot)  # Allows for relative sizing of subplots in a grid (which grid.arrange() does not).
+
+#install.packages("choroplethr", dependencies = T)
+library(choroplethr)
+#library(devtools)
+#install_github('arilamstein/choroplethrZip@v1.5.0')
+library(choroplethrZip)
+#install.packages("zipcode")
+library(zipcode)
 ```
 ## Dataset
 
@@ -46,7 +54,7 @@ I choose to work on the suggested data for the presidential election in the US i
 
 ### Preparation
 
-As stated in the dataset description it's sufficient to work with only one state. I choose the dataset from Maryland (MD). Some of the data sets contain obsolete commas on the end of each line. To get around this, I added the same obsolete comma to the header line. Then the data can be loaded.
+As stated in the dataset description it's sufficient to work with only one state. I choose the dataset from Maryland (MD). Some of the datasets contain obsolete commas on the end of each line. To get around this, I added the same obsolete comma to the header line. Then the data can be loaded.
 
 ```{r echo=FALSE}
 contributions <- read.csv("P00000001-MD.csv")
@@ -54,9 +62,89 @@ contributions <- read.csv("P00000001-MD.csv")
 contributions$X <- NULL
 ```
 
+To ease further analysis and shorten graph labels the candidate surnames are used.
+
+```{r  echo=FALSE, message=FALSE, warning=FALSE}
+extract_surname <- function(candidate_name) {
+  surname <- unlist(strsplit(toString(candidate_name), ","))[[1]]
+  return(surname)
+}
+
+extract_surnames <- function(candidate_names) {
+  return(unlist(lapply(candidate_names, extract_surname)))
+}
+
+# Unit tests:
+#extract_surname("Sternisko, Jonas")
+#extract_surnames(c("Sternisko, Jonas", "Werner, Martin"))
+
+candidate_names <- levels(contributions$cand_nm)
+surnames <- extract_surnames(candidate_names)
+levels(contributions$cand_nm) <- surnames
+
+```
+
+The variable of the receipt date is present as string. It needs to be transformed to a UTC date so that we can further analyse it. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# The following function does this job
+
+convert_date <- function(date_string) {
+  return(as.Date(strptime(date_string, "%d-%b-%y")))
+}
+
+silence <- Sys.setlocale("LC_ALL","C")  # otherwise "DEC" would not be recognized when working on a German locale
+contributions$date <- convert_date(contributions$contb_receipt_dt)
+```
+
+The ZIP code is not in a generic format. For later investigation, we only care 
+about the first five digits. The conversion uses the `zipcodes` library.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Unfortunately, clean.zipcodes does not work if the dash between 
+# the first 5 and last 4 numbers in the zip code is missing.
+insert_dash <- function(zipcode) {
+  if (!is.na(zipcode) & nchar(zipcode) == 9) {
+    return(paste(substr(zipcode, 1, 5), "-", substr(zipcode, 6, 9), sep = ""))
+  } else {
+    return(zipcode)
+  }
+}
+# Unittest:
+#clean.zipcodes(c(insert_dash('021991880')))
+
+contributions$contbr_zip <- as.character(contributions$contbr_zip)
+contributions$contbr_zip <- unlist(lapply(contributions$contbr_zip, insert_dash))
+contributions$contbr_zip <- clean.zipcodes(contributions$contbr_zip)
+contributions$contbr_zip <- factor(contributions$contbr_zip)
+```
+
+For later analysis, the data needs to be extended by the party of the candidate. First, get all distinct candidates and then create a table with candidate and respective party using Wikipedia as source:
+
+ * https://en.wikipedia.org/wiki/Republican_Party_presidential_candidates,_2016
+ * https://en.wikipedia.org/wiki/Democratic_Party_presidential_candidates,_2016
+ * https://en.wikipedia.org/wiki/United_States_third-party_and_independent_presidential_candidates,_2016
+
+This can be used to extend the `contributions` dataset by joining with the party table.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+candidates = sort(unique(contributions$cand_nm))
+# Retrieved by manual Wikipedia lookup
+parties <- tibble(cand_nm = candidates, 
+                  party = recode(factor(c("R", "R", "R", "D", "R", "R", "R", 
+                                          "R", "R", "R", "O", "R", "D", "O", 
+                                          "D", "R", "R", "R", "R", "D", "R", 
+                                          "O", "R", "R", "D")), 
+                                 R="Republicans", D="Democrats", O="Third-Party"))
+
+contributions <- inner_join(contributions, parties)
+```
+
+Now there is a new variable `party` in the data. Later we can group the data according to this variable and analyse the different partitions.
+
 ## Exploratory Analysis
 
-The present data set consists of 183279 contributions registered by the Federal Election Commission. Lets explore the meaning and distribution of the different variables. First, I inspect the data using `head(contributions)`, `names(contributions)` and RStudio's overview.
+The present dataset consists of 183279 contributions registered by the Federal Election Commission. Lets explore the meaning and distribution of the different variables. First, I inspect the data using `head(contributions)`, `names(contributions)` and RStudio's overview.
 
 The variables `cand_id` seem to refer to an id of the candidate name `cand_nm`, which is more human readable than the former so I will not pursue `cand_id` any further. Likewise,  the variables `receipt_desc`, `memo_cd`, `memo_text`, `form_tp`, `file_num`, `tran_id` seem to refer to the way or extra information the contributions are registered at the Federal Election Commission. I will not investigate these either. Thus, the following variables remain:
 
@@ -79,23 +167,41 @@ The variables `cand_id` seem to refer to an id of the candidate name `cand_nm`, 
 
 ```{r echo=FALSE}
 by_candidate <- group_by(contributions[c("cand_nm", "contb_receipt_amt")], cand_nm)
-summarize(by_candidate, n = n()) %>% arrange(desc(n)) 
+number_contributions_per_candidate <- summarize(by_candidate, n = n()) %>% 
+  arrange(desc(n))
+ggplot(data = number_contributions_per_candidate,
+       aes(x = cand_nm, y = n)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust = 0))
+
 ```
 
 This already gives and idea, that most contributions in Maryland were given to Hillary Clinton. But is this also true for the total amount contributed for each individual campaign?
 
 ```{r echo=FALSE}
-summarize(by_candidate, total.contributions = sum(contb_receipt_amt))  %>% arrange(desc(total.contributions))
+total_contributions_per_candidate <- summarize(by_candidate, total.contributions = sum(contb_receipt_amt))  %>% arrange(desc(total.contributions))
+
+ggplot(data = total_contributions_per_candidate,
+       aes(x = cand_nm, y = total.contributions)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust = 0))
 ```
 
-The top 3 are the same, but below there are differences. Also, Bernie Sanders and Donald Trump are head to head regarding the total amount contributed to each of their campaigns. This requires a deeper look into how much has been contributed in average. Lets look all three numbers in one table:
+The leader is still the same (Hillary Clinton), but below there are differences. O'Malley, Sanders and Trump are head to head regarding the total amount contributed to each of their campaigns. This requires a deeper look into how much has been contributed in average. 
 
 ```{r echo=FALSE}
 amounts_by_candidate <- summarize(by_candidate, n = n(), total.contributions = sum(contb_receipt_amt), average.contribution = total.contributions / n) %>% arrange(desc(n))
-amounts_by_candidate
+
+ggplot(data = amounts_by_candidate,
+       aes(x = cand_nm, y = average.contribution)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust = 0))
+
 ```
 
-Lets visualize this.
+Interestingly, the candidates who had the most contributions to their campaign, had the lowest contribution in average. The reason for this might be that when starting to campaign, the campaign organizers try to get convince big supporters which contribute large individual amounts and only later on, when the campaign has enough chance to succeed, try to raise contributions from the broader public, where contributions are typically smaller in average. 
+
+Lets compare again the number of contributions and total amount contributed.
 
 ```{r echo=FALSE}
 ggplot(data = amounts_by_candidate, aes(x = n, y = total.contributions, label = cand_nm)) +
@@ -106,24 +212,13 @@ ggplot(data = amounts_by_candidate, aes(x = n, y = total.contributions, label = 
   geom_smooth(method = "lm")
 ```
 
-Interestingly, most data points fall along a line when both x and y axes use logarithmic scale. Just the donations for Rick Perry fall off a lot from this.
+Interestingly, most data points fall along a line when both x and y axes use logarithmic scale. Just the donations for Rick Perry fall off a lot from this. Thus the data shows the obvious: The more individual contributions you get, the higher the total amount contributed to your campaign.
 
 Maybe we come back to this later and check the distributions of the amounts per candidate, but for now I don't want to dive too deep into this.
 
 ### Date
 
-Lets investigate when people contributed. The variable of the receipt date is present as string. It needs to be transformed to a UTC date so that we can further analyse it. The following function does this job:
-
-```{r echo=FALSE}
-convert_date <- function(date_string) {
-  return(as.Date(strptime(date_string, "%d-%b-%y")))
-}
-
-Sys.setlocale("LC_ALL","C")  # otherwise "DEC" would not be recognized when working on a German locale
-contributions$date <- convert_date(contributions$contb_receipt_dt)
-```
-
-Now we can create a histogram for the dates:
+Lets investigate when people contributed. We can create a histogram for the dates:
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 general_election_date <- as.Date("2016-11-08")
@@ -153,14 +248,102 @@ Contributing to political campaigns seems to be a professional thing, people do 
 
 #### By city
 
-```{r echo=FALSE}
+```{r echo=FALSE, fig.width=8, fig.height=7}
 by_city <- group_by(contributions, contbr_city)
-summarize(by_city, n = n()) %>% arrange(desc(n))
+contributions_by_city <- summarize(by_city, n = n(), 
+                                   total.contributions = sum(contb_receipt_amt), 
+                                   average.contribution = mean(contb_receipt_amt)) %>% 
+  arrange(desc(n))
+p1 <- ggplot(data = top_n(contributions_by_city, 10, total.contributions), aes(x = contbr_city, y = n)) +
+  geom_col() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank())
+p2 <- ggplot(data = top_n(contributions_by_city, 10, total.contributions), aes(x = contbr_city, y = average.contribution)) +
+  geom_col() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank()) +
+  ylab("average")
+p3 <- ggplot(data = top_n(contributions_by_city, 10, total.contributions), aes(x = contbr_city, y = total.contributions)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0.5)) +
+  ylab("total amount")
+plot_grid(p1, p2, p3, nrow = 3, align = "v", rel_heights = c(1/2, 1/2, 1))
 ```
 
-Of these cities, Baltimore has by far the largest population. But the population seems unrelated to the number of contributions. The large number of contributions from smaller municipalities like Silver Spring and Bethesda may be explained by these being suburbs of Washington, DC. thus being home to more than politically involved persons and organizations than other communities of similar size.
+Of these cities, Baltimore has by far the largest population. But the population seems unrelated to the number of contributions. The large number of contributions from smaller municipalities like Silver Spring and Bethesda may be explained by these being suburbs of Washington, DC. thus being home to more than politically involved persons and organizations than other communities of similar size. This becomes even more visible when looking at the total amount contributed. 
 
-This could be broken down further by examining the zip code, but I don't feel that this will provide much more insight, as zip codes are not as easy to interpret as city names.
+#### Number of contributions by zip code
+
+This can be broken down further by examining the zip code. As suggested by the first project review, a heatmap shows where contributions are mainly made:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Heatmap by ZIP code
+contributions_by_zip <- summarize(group_by(contributions, contbr_zip),
+                                  n = n(),
+                                  mean = mean(contb_receipt_amt),
+                                  total = sum(contb_receipt_amt))
+
+df <- tibble(region = contributions_by_zip$contbr_zip,
+             value = contributions_by_zip$n)
+# Remove NA
+df <- na.omit(df)
+# Remove ZIP codes which are not in the library
+remove_manually <- as.character(c("03960", "06122", 17, 20185, 20604, 20610, 20614, 20627, 20656, 20703, 20704, 20709, 20718, 20719, 20725, 20726, 20741, 20749, 20750, 20757, 20768, 20773, 20775, 20787, 20788, 20791, 20813, 20824, 20825, 20827, 20830, 20848, 20849, 20859, 20875, 20883, 20884, 20885, 20891, 20892, 20898, 20907, 20911, 20913, 20914, 20915, 20916, 20917, 20918, 20952, 20991, 21020, 21022, 21023, 21041, 21094, 21106, 21123, 21139, 21150, 21203, 21282, 21284, 21287, 21404, 21412, 21501, 21503, 21505, 21528, 21715, 21720, 21741, 21759, 21765, 21803, 21843, 21922, 64171, 99999))
+# Define %notin% function, courtesy of https://stackoverflow.com/a/7498829/841567
+`%notin%` <- function(x,y) !(x %in% y) 
+# Drop it like it's hot
+df <- filter(df, region %notin% remove_manually)
+# Set missing to 0 for nicer colors.
+missing <- as.character(c(21862, 21077, 21626, 21746, 21010, 21538, 21543, 21672, 21916, 21930, 21814, 21675, 20626, 20660, 21251, 21866, 20612, 21542, 21252, 21523, 21627, 21641, 21781, 21902, 21640, 21644, 21824, 21890, 21240, 21105, 20899, 21920, 20621, 21540))
+df <- rbind(df, tibble(region = missing, value = 0))
+
+zip_choropleth(df,
+               num_colors = 9,
+               state_zoom = "maryland",
+               title      = "2016 Presidential Election Contributions in Maryland",
+               legend     = "Number of contributions")
+
+```
+
+
+#### Average amount contributed by zip code
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df <- tibble(region = contributions_by_zip$contbr_zip,
+             value = contributions_by_zip$mean)
+# Remove NA
+df <- na.omit(df)
+# Remove ZIP codes which are not in the library
+df <- filter(df, region %notin% remove_manually)
+# Set missing to 0 for nicer colors
+df <- rbind(df, tibble(region = missing, value = 0))
+
+zip_choropleth(df,
+               num_colors = 9,
+               state_zoom = "maryland",
+               title      = "2016 Presidential Election Contributions in Maryland",
+               legend     = "Average contributed")
+
+```
+
+#### Total amount contributed by zip code
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df <- tibble(region = contributions_by_zip$contbr_zip,
+             value = contributions_by_zip$total)
+# Remove NA
+df <- na.omit(df)
+# Remove ZIP codes which are not in the library
+df <- filter(df, region %notin% remove_manually)
+# Set missing to 0 for nicer colors
+df <- rbind(df, tibble(region = missing, value = 0))
+
+zip_choropleth(df,
+               num_colors = 9,
+               state_zoom = "maryland",
+               title      = "2016 Presidential Election Contributions in Maryland",
+               legend     = "Total contributed")
+
+```
+
 
 #### Top 10 contributions
 
@@ -168,17 +351,23 @@ Lets find out who donated most:
 
 ```{r echo=FALSE}
 by_contributor <- group_by(contributions, contbr_nm)
-summarize(by_contributor, total.amount.contributed = sum(contb_receipt_amt)) %>% arrange(desc(total.amount.contributed))
+summarize(by_contributor, total.amount.contributed = sum(contb_receipt_amt)) %>% 
+  arrange(desc(total.amount.contributed))
 ```
 
 Lets check if the top contributors invested in multiple candidates. First, check if they contributed multiple times at all:
 
 ```{r echo=FALSE}
-summarize(by_contributor, total.amount.contributed = sum(contb_receipt_amt), n = n()) %>% arrange(desc(total.amount.contributed)) %>% head(n = 10)
+summarize(by_contributor, total.amount.contributed = sum(contb_receipt_amt), 
+          n = n()) %>% arrange(desc(total.amount.contributed)) %>% 
+  head(n = 10)
 
 # OK, the top 10 contributors did up to 13 individual contributions, each. So lets check further:
 
-summarize(by_contributor, total.amount.contributed = sum(contb_receipt_amt), n_cand = length(unique(cand_nm))) %>% arrange(desc(total.amount.contributed)) %>% head(n = 10)
+summarize(by_contributor, total.amount.contributed = sum(contb_receipt_amt), 
+          n_cand = length(unique(cand_nm))) %>% 
+  arrange(desc(total.amount.contributed)) %>% 
+  head(n = 10)
 
 ```
 
@@ -227,7 +416,7 @@ ggplot(data = filter(contributions, contb_receipt_amt > 0), aes(x = contb_receip
 
 #### By state
 
-This data set should only contain contributions from Maryland, but lets confirm this.
+This dataset should only contain contributions from Maryland, but lets confirm this.
 
 ```{r echo=FALSE}
 summary(contributions$contbr_st)
@@ -238,30 +427,12 @@ Yes, indeed.
 
 ### Per party and candidate
 
-Lets investigate differences by party. Therefore, the data needs to be extended by the party of the candidate. First, get all distinct candidates and then create a table with candidate and respective party using Wikipedia as source:
-
- * https://en.wikipedia.org/wiki/Republican_Party_presidential_candidates,_2016
- * https://en.wikipedia.org/wiki/Democratic_Party_presidential_candidates,_2016
- * https://en.wikipedia.org/wiki/United_States_third-party_and_independent_presidential_candidates,_2016
-
-This can be used to extend the `contributions` dataset by joining with the party table.
-
-```{r echo=FALSE, warning=FALSE, message=FALSE}
-candidates = sort(unique(contributions$cand_nm))
-candidates
-# Retrieved by manual Wikipedia lookup
-
-parties <- tibble(cand_nm = candidates, 
-                  party = recode(factor(c("R", "R", "R", "D", "R", "R", "R", "R", "R", "R", "O", "R", "D", "O", "D", "R", "R", "R", "R", "D", "R", "O", "R", "R", "D")), R="Republicans", D="Democrats", O="Third-Party"))
-
-contributions <- inner_join(contributions, parties)
-```
-
-Now there is a new variable `party` in the data and we can group the data and check for the different partitions of the data:
+Lets investigate differences by party. 
 
 ```{r echo=FALSE}
 by_party <- group_by(contributions, party)
-summary <- summarize(by_party, mean_amount = mean(contb_receipt_amt), n = n(), total_amount = sum(contb_receipt_amt))
+summary <- summarize(by_party, mean_amount = mean(contb_receipt_amt), n = n(), 
+                     total_amount = sum(contb_receipt_amt))
 p1 <- ggplot(data = summary, aes(x = party, y = total_amount)) +
   geom_col()
 p2 <- ggplot(data = summary, aes(x = party, y = mean_amount)) +
@@ -270,24 +441,26 @@ grid.arrange(p1, p2, ncol=1)
 ```
 
 
-### Compare Hillary and Bernie and other Democrats.
+### Compare Hillary Clinton, Bernie Sanders and other Democrats
 
 Lets have a look into different candidates of the same party. As we have seen, Hillary Clinton received the largest amount of contributions. But can we see any more patterns?
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE} 
 democrat_contributions <- group_by(filter(contributions, party == "Democrats"), cand_nm)
 ggplot(data = democrat_contributions, aes(x = date)) + 
   facet_wrap(~ cand_nm) +
-  geom_histogram() 
+  geom_histogram() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust=1))  # rotate x-axis labels
 ```
 
 Of the Democrats' candidates, only Clinton and Sanders received noteworthy contributions. So lets compare these two and consider again the dates for the primary and general election. Also, add markers for the end of their campaigns.
 
 ```{r echo=FALSE}
-democrat_candidates <- c("Clinton, Hillary Rodham", "Sanders, Bernard")
+democrat_candidates <- c("Clinton", "Sanders")
 campaign_end <- tibble(cand_nm = democrat_candidates, 
                        end_date = as.Date(c("2016-11-08", "2016-07-12")))
-ggplot(data = filter(democrat_contributions, is.element(cand_nm, democrat_candidates)), aes(x = date)) + 
+ggplot(data = filter(democrat_contributions, is.element(cand_nm, democrat_candidates)), 
+       aes(x = date)) + 
   facet_wrap(~ cand_nm) +
   geom_histogram(binwidth=30) + 
   geom_vline(data = campaign_end, aes(xintercept=end_date), color="red") +
@@ -297,21 +470,42 @@ ggplot(data = filter(democrat_contributions, is.element(cand_nm, democrat_candid
 
 While Bernie Sanders's were at a higher level prior to the primaries, contributions to Hillary Clinton's campaign continued to grow, while the former they started to decline. Interestingly, after the Bernie Sanders campaign ended, there where still contributions for more than a month or two. Maybe the committee created some debt which needed to be leveled out?
 
+Lets compare individual contributions by candidate and amount.
+
+```{r echo=FALSE}
+
+democratic_candidates <- c("Clinton", "Sanders", "O'Malley")
+
+ggplot(data = filter(filter(contributions, 
+                            cand_nm %in% democratic_candidates), 
+                     contb_receipt_amt > 10), 
+       aes(x = date, y = contb_receipt_amt)) +
+  geom_point(size = .5, alpha = .1) +
+  scale_y_log10() +
+  facet_grid(cand_nm ~ .) +
+  ggtitle("Democrats") +
+  xlab("Date") +
+  ylab("Amount")
+```
+
+
 ### Compare Trump and last other Republican Candidates.
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 republican_contributions <- group_by(filter(contributions, party == "Republicans"), cand_nm)
 ggplot(data = republican_contributions, aes(x = date)) + 
   facet_wrap(~ cand_nm) +
-  geom_histogram()
+  geom_histogram() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust=1, size = 8),  # rotate x-axis labels
+        axis.text.y = element_text(size = 8))  
 ```
 
 Also here more detail:
 
 ```{r echo=FALSE, message=FALSE}
-#levels(contributions$cand_nm)
-republican_candidates <- c("Trump, Donald J.", "Rubio, Marco", "Carson, Benjamin S.", "Cruz, Rafael Edward 'Ted'", "Kasich, John R.")
-campaign_end <- tibble(cand_nm = republican_candidates, 
-                       end_date = as.Date(c("2016-11-08", "2016-03-15", "2016-03-04", "2016-05-03", "2016-05-04")))
+republican_candidates <- c("Trump", "Rubio", "Carson", "Cruz", "Kasich")
+campaign_end <- tibble(
+  cand_nm = republican_candidates, 
+  end_date = as.Date(c("2016-11-08", "2016-03-15", "2016-03-04", "2016-05-03", "2016-05-04")))
 ggplot(data = filter(republican_contributions, 
                      is.element(cand_nm, republican_candidates)), 
        aes(x = date)) + 
@@ -319,10 +513,27 @@ ggplot(data = filter(republican_contributions,
   geom_histogram(binwidth=30) + 
   geom_vline(data = campaign_end, aes(xintercept=end_date), color="red") +
   geom_vline(xintercept = general_election_date, color = "black") +
-  geom_vline(xintercept = primary_election_date, color = "black")
+  geom_vline(xintercept = primary_election_date, color = "black") +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust=1, size = 8),
+        axis.text.y = element_text(size = 8))
 ```
 
 Similar to the Democrat candidates, the contributions increase when the primaries get under way. Donald Trumps campaign seems to make an exception. Prior to the primary, there are just a couple of contributions from Maryland. The number of contributions jump starts once he got the Republican Party ticket.
+
+Lets compare the amounts contributed to different candidates. 
+
+```{r echo=FALSE}
+ggplot(data = filter(filter(contributions, 
+                            cand_nm %in% republican_candidates), 
+                     contb_receipt_amt > 10), 
+       aes(x = date, y = contb_receipt_amt)) +
+  geom_point(size = .5, alpha = .1) +
+  scale_y_log10() +
+  facet_grid(cand_nm ~ .) +
+  ggtitle("Republicans") +
+  xlab("Date") +
+  ylab("Amount")
+```
 
 ### Occupation and employer
 
@@ -330,25 +541,29 @@ Skipped. Too diverse.
 
 ### Others
 
-Lets check with GGally if there are further relations within the data.
+Finally, check with GGally if there are further relations within the data.
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-summary(contributions)
-
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
 # ggpairs() can not be applied to the data without further tuning, thus
 # - select a subset:
 candidates <- c(republican_candidates, democrat_candidates)
-contributions_to_last_candidates <- filter(contributions, is.element(cand_nm, candidates))
+contributions_to_last_candidates <- filter(contributions, 
+                                           is.element(cand_nm, candidates))
 # - run on a subset of variables:
-contributions_to_last_candidates <- contributions_to_last_candidates[c("cand_nm", "contb_receipt_amt", "date", "election_tp", "party")]
+contributions_to_last_candidates <- contributions_to_last_candidates[
+  c("cand_nm", "contb_receipt_amt", "date", "election_tp", "party")]
 # - recreate factors, to get rid of now empty levels:
 contributions_to_last_candidates <- droplevels(contributions_to_last_candidates)
 
 ggpairs(data = contributions_to_last_candidates,
         lower = list(continous = wrap("points", shape = I("."))),
-        upper = list(combo = wrap("box", outlier.shape = I("."))))
+        upper = list(combo = wrap("box", outlier.shape = I(".")))) +
+  theme(axis.text.x = element_text(angle = -30, size = 6, hjust = 0.2),
+        axis.text.y = element_text(angle = 30, size = 6))  # rotate and resize axis labels
 
 ```
+
+
 
 ## Final Plots and Summary
 
@@ -361,14 +576,17 @@ Lets compare the contributions by the total amount contributed and the number of
 #?RColorBrewer
 colors <- colorRampPalette(brewer.pal(8, "Dark2"), space = "Lab")(20)
 
-ggplot(data = top_n(amounts_by_candidate, 20, wt = n), aes(x = n, y = total.contributions, label = cand_nm, color = cand_nm)) +
+ggplot(data = top_n(amounts_by_candidate, 20, wt = n), 
+       aes(x = n, y = total.contributions, label = cand_nm, color = cand_nm)) +
   geom_smooth(method = "lm", se = FALSE, color = "grey") +
   geom_point() +  
   scale_color_manual(values = colors,
                      guide = guide_legend(title = 'Candidates', ncol = 3)) +
   geom_text_repel(size = 3) +
-  scale_x_log10(limits = c(1, max(amounts_by_candidate$n) * 1.1), breaks = c(1, 10, 100, 1000, 10000, 100000)) + 
-  scale_y_log10(limits = c(1, max(amounts_by_candidate$total.contributions) * 1.1), breaks = c(1000, 10000, 100000, 1000000, 10000000)) +
+  scale_x_log10(limits = c(1, max(amounts_by_candidate$n) * 1.1), 
+                breaks = c(1, 10, 100, 1000, 10000, 100000)) + 
+  scale_y_log10(limits = c(1, max(amounts_by_candidate$total.contributions) * 1.1), 
+                breaks = c(1000, 10000, 100000, 1000000, 10000000)) +
   xlab("Total number of contributions") +
   ylab("Total amount contributed to campaign (USD)") + 
   ggtitle("Contributions to Presidential Election 2016 Campaigns in Maryland") +
@@ -384,32 +602,22 @@ Hillary Clinton also got the largest total amount of contributions, her outperfo
 Because the primary process was quite different and candidate selection was independent between Democrats and Republicans, I feel it is necessary to see this in two separate plots. Lets start with the Republicans. We include the candidates which dropped out last and Ben Carson, who used to act as head of Jon Hopkins hospital in Baltimore.
 
 ```{r echo=FALSE}
-extract_surname <- function(candidate_name) {
-  surname <- unlist(strsplit(toString(candidate_name), ","))[[1]]
-  return(surname)
-}
-
-#extract_surname("Sternisko, Jonas")
-
-extract_surnames <- function(candidate_names) {
-  return(lapply(candidate_names, extract_surname))
-}
-
-#extract_surnames(c("Sternisko, Jonas", "Werner, Martin"))
-
-
-ggplot(data = filter(filter(contributions, cand_nm %in% republican_candidates), contb_receipt_amt > 10), aes(x = date, y = contb_receipt_amt, color = cand_nm)) +
+ggplot(data = filter(filter(contributions, 
+                            cand_nm %in% republican_candidates), 
+                     contb_receipt_amt > 10), 
+       aes(x = date, y = contb_receipt_amt, color = cand_nm)) +
   geom_point(size = .5, alpha = .05) +
   scale_y_log10(breaks = c(10, 100, 1000, 10000)) +
   scale_color_manual(values = colors) +
-  facet_grid(cand_nm ~ ., labeller = labeller(cand_nm = extract_surnames)) +
+  facet_grid(cand_nm ~ .) +
   theme(legend.position = "none") +
   scale_x_date(breaks=c(primary_election_date, general_election_date)) +
   geom_vline(xintercept = general_election_date, color = "grey") +
   geom_vline(xintercept = primary_election_date, color = "grey") +
+  theme(axis.text = element_text(size=8)) +
   ggtitle("Contributions to Republican Candidates for the \nPresidential Election 2016 Campaigns in Maryland") +
   xlab("Date") +
-  ylab("Amount Contributed in USD")
+  ylab("Amount Contributed (USD)")
 ```
 
 What is most striking in this graph is the poor support for Donald Trump's campaign prior to the primary election. Only after that, he received considerable financial support. Further looking into the contributions to hist campaign, after a certain date there are no more small contributions, which used to be quite strong before that.
@@ -420,45 +628,48 @@ For the candidates of the democratic party, we look only on the top candidates. 
 
 ```{r echo=FALSE}
 
-democratic_candidates <- c("Clinton, Hillary Rodham", "Sanders, Bernard", "O'Malley, Martin Joseph")
+democratic_candidates <- c("Clinton", "Sanders", "O'Malley")
 
-ggplot(data = filter(filter(contributions, cand_nm %in% democratic_candidates), contb_receipt_amt > 10), aes(x = date, y = contb_receipt_amt, color = cand_nm)) +
+ggplot(data = filter(filter(contributions, 
+                            cand_nm %in% democratic_candidates), 
+                     contb_receipt_amt > 10), 
+       aes(x = date, y = contb_receipt_amt, color = cand_nm)) +
   geom_point(size = .5, alpha = .05) +
   scale_y_log10(breaks = c(10, 100, 1000, 10000)) +
   scale_color_manual(values = colors) +
-  facet_grid(cand_nm ~ ., labeller = labeller(cand_nm = extract_surnames)) +
+  facet_grid(cand_nm ~ .) +
   theme(legend.position = "none") +
   scale_x_date(breaks=c(primary_election_date, general_election_date)) +
   geom_vline(xintercept = general_election_date, color = "grey") +
   geom_vline(xintercept = primary_election_date, color = "grey") +
+  theme(axis.text = element_text(size=8)) +
   ggtitle("Contributions to Democratic Candidates for the \nPresidential Election 2016 Campaigns in Maryland") +
   xlab("Date") +
-  ylab("Amount Contributed in USD")
+  ylab("Amount Contributed (USD)")
 ```
 
-Compared to the other candidates (also republican), Hillary Clinton had many high-amount contributions from the beginning of the election period.
+Compared to the other candidates (also republican), Hillary Clinton had many high-amount contributions from the beginning of the election period throughout the end.
 
 Martin O'Malley, the former Baltimore mayor, also had strong support from high-amount contributors, but probably not outside of Maryland. 
 
-Bernie Sander's campaign contributions started relatively late. Compared to other democratic candidates, his campaign had almost no high-amount contributions (in Maryland). 
+Bernie Sander's campaign contributions started relatively late. Compared to other democratic candidates, his campaign had almost no high-amount contributions (in Maryland). The data indicates that his supporters have less money available to spend on political campaigns.
+
+Hillary Clinton won the primary and general election in Maryland, which is confirmed by the contribution support. Having continuous contributions in both large and small amounts seems allow to pursue the campaign until the end. This can also be interpreted as having support from a broader part of the society than for the other candidates.
 
 Another interesting fact that can be observed in both graphs is that the date of the primary election in Maryland (2016-04-26) does not seem to influence the contribution activity. 
-
-Hillary Clinton won the primary and general election in Maryland, which is confirmed by the contribution support.
 
 ## Reflection
 
 This project was really interesting. I liked exploring the data from scratch, without any prior knowledge about the subject. OK, we follow the news on the US presidential elections -- I have a general idea how the political system in the US works -- but I had no clue about the role contributions play in the campaigning process. The idea that you support a candidate rather than a party is strange to me. So after all, Americans invest a lot of money with a high risk for the respective candidate's failure. So what is the point if your candidate wins? Do you actually get anything in return for your money?
 
-What I found hard when working with this dataset was to determine valuable data. Many variables seem interesting at first glance, but in the end this data set boils down to the candidate name, the date of the contribution and amount which has been contributed. Then there is a vast number of republican candidates which played no major role and dropped out early. But to see patterns, some of these need to be included. It was hard for me to judge where to draw the line, which candidates to include and which not. Also some of the variables, like employer or occupation of the contributor are just too diverse. 
+What I found hard when working with this dataset was to determine valuable data. Many variables seem interesting at first glance, but in the end this dataset boils down to the candidate name, the date of the contribution and amount which has been contributed. Then there is a vast number of republican candidates which played no major role and dropped out early. But to see patterns, some of these need to be included. It was hard for me to judge where to draw the line, which candidates to include and which not. Also some of the variables, like employer or occupation of the contributor are just too diverse. 
 
 I got a lot of practical experience with shaping graphs using ggplot. What was new and quite helpful are the ggrepel and ggthemes libraries and how to create color palettes using the color brewer thingy.
 
-I'd like to see if the patterns found for the Maryland data generalize for the whole US:
+When including the feedback on the first version of the solution, I struggled with the `choroplethr` and `choroplethrZip` packages. Setting the libraries and dependencies up was a lot of work. I had to spend much more effort on fixing the zip codes until they matched the libraries undocumented requirements. In the end, the library produces only mediocre choropleth plots full of artifacts. It does not even expose an API to change the color or the breaks of the color-buckets, nor does it integrate with R's layer model to produce graphs. As we have seen in the previous analysis, the size of individual contributions needs to be looked at on a non-linear scale, which is not available here. Thus, those plots just have one a single color-value for more than 90% of the amount contributed. With these limitations, the library and the plots produced by it cannot be used to highlight trends in the data, let alone yield nice results for the final plots section. I guess for the next project, I will be looking for an alternative way to produce these graphs.
+
+Given more time, I'd like to see if the patterns found for the Maryland dataset generalize for the whole US:
 
 * Was overall financial support for Donald Trump was larger than for Hillary Clinton?
 * Did support for Donald Trump start only after all other republican candidates have been out of the race?
 * Did candidates have more financial support in their home states or places where they have been active before (like O'Malley and Carson in Baltimore)?
-
-
-
