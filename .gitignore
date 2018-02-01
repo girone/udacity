@@ -102,6 +102,10 @@ ENV/
 
 
 # R
-.RData
-.Rhistory
+*.RData
+*.Rhistory
 
+# Archives
+*.tar.gz
+*.bz2
+*.zip
