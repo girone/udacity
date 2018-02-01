@@ -1,3 +1,6 @@
 [submodule "docker-udacity-DAND"]
 	path = docker-udacity-DAND
 	url = git@github.com:girone/docker-udacity-DAND.git
+[submodule "lessons/05 - Exploratory Data Analysis/diamonds-data"]
+	path = lessons/05 - Exploratory Data Analysis/diamonds-data
+	url = https://github.com/SolomonMg/diamonds-data.git
