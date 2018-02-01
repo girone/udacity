@@ -4,3 +4,6 @@
 [submodule "lessons/05 - Exploratory Data Analysis/diamonds-data"]
 	path = lessons/05 - Exploratory Data Analysis/diamonds-data
 	url = https://github.com/SolomonMg/diamonds-data.git
+[submodule "lessons/06 - Machine Learning/ud120-projects"]
+	path = lessons/06 - Machine Learning/ud120-projects
+	url = https://github.com/girone/ud120-projects.git
