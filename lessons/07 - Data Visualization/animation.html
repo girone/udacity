@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <style>
+        body {
+            background-color: black;
+        }
+    </style>
+
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+</head>
+
+<body>
+    <script>
+        function randomNormalGaussian() {
+            var rand = 0;
+            for (var i = 0; i < 6; i += 1) {
+                rand += Math.random();
+            }
+            return (rand / 6) - 0.5;
+        }
+        function randomGaussian(mu, sigma) {
+            var normal = randomNormalGaussian();
+            return (normal * sigma) + mu;
+        }
+
+        var width = 1920,
+            height = 1080;
+
+        var numRects = 0;
+
+        var avgTranslationSpeed = .1,
+            avgRotationSpeed = 1,
+            start = Date.now();
+
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .append("g");
+
+        var defs = svg.append("defs")
+        var gradient = defs.append("linearGradient")
+            .attr("id", "green_rect_gradient")
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "100%")
+            .attr("y2", "100%");
+        gradient.append("stop").attr("offset", "0%").attr("style", "stop-color: rgb(0, 175, 85); stop-opacity: 1;");
+        gradient.append("stop").attr("offset", "75%").attr("style", "stop-color: rgb(0, 175, 85); stop-opacity: .25;");
+
+        var avgRectWidth = avgRectHeight = 200;
+
+        function addRect() {
+            var rectWidth = rectHeight = randomGaussian(avgRectWidth, avgRectWidth);
+            var translationSpeed = randomGaussian(avgTranslationSpeed, 1);
+            var rotationSpeed = randomGaussian(avgRotationSpeed, 10);
+            var angularOffset = Math.random() * 360;
+            var x = Math.random() * width,
+                y = Math.random() * height;
+            var id = "rect_" + numRects;
+            var rect = svg.append("rect")
+                .attr("id", id)
+                .attr("width", rectWidth)
+                .attr("height", rectHeight)
+                .attr("x", -rectWidth / 2)
+                .attr("y", -rectHeight / 2)
+                .attr("fill", "url(#green_rect_gradient)");
+
+            d3.timer(function () {
+                var offset = (Date.now() - start) * translationSpeed;
+                transform = function () { return "translate(" + (x + offset) % width + "," + (y + offset) % height + ")rotate(" + (angularOffset += rotationSpeed) + ")" };
+
+                svg.selectAll("#" + id).attr("transform", transform);
+            })
+
+            numRects += 1;
+        }
+
+        addRect();
+        addRect();
+        addRect();
+        addRect();
+        addRect();
+    </script>
+</body>
+
+</html>
