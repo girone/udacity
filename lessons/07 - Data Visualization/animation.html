@@ -41,14 +41,23 @@
             .append("g");
 
         var defs = svg.append("defs")
-        var gradient = defs.append("linearGradient")
+        var greenGradient = defs.append("linearGradient")
             .attr("id", "green_rect_gradient")
             .attr("x1", "0%")
             .attr("y1", "0%")
             .attr("x2", "100%")
             .attr("y2", "100%");
-        gradient.append("stop").attr("offset", "0%").attr("style", "stop-color: rgb(0, 175, 85); stop-opacity: 1;");
-        gradient.append("stop").attr("offset", "75%").attr("style", "stop-color: rgb(0, 175, 85); stop-opacity: .25;");
+        greenGradient.append("stop").attr("offset", "0%").attr("style", "stop-color: rgb(0, 175, 85); stop-opacity: 1;");
+        greenGradient.append("stop").attr("offset", "75%").attr("style", "stop-color: rgb(0, 175, 85); stop-opacity: .25;");
+
+        var redGradient = defs.append("linearGradient")
+            .attr("id", "red_rect_gradient")
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "100%")
+            .attr("y2", "100%");
+        redGradient.append("stop").attr("offset", "0%").attr("style", "stop-color: rgb(175, 10, 10); stop-opacity: 1;");
+        redGradient.append("stop").attr("offset", "75%").attr("style", "stop-color: rgb(175, 10, 10); stop-opacity: .25;");
 
         var avgRectWidth = avgRectHeight = 200;
 
@@ -65,8 +74,12 @@
                 .attr("width", rectWidth)
                 .attr("height", rectHeight)
                 .attr("x", -rectWidth / 2)
-                .attr("y", -rectHeight / 2)
-                .attr("fill", "url(#green_rect_gradient)");
+                .attr("y", -rectHeight / 2);
+            if (Math.random() < 0.85) {
+                rect.attr("fill", "url(#green_rect_gradient)");
+            } else {
+                rect.attr("fill", "url(#red_rect_gradient)");
+            }
 
             d3.timer(function () {
                 var offset = (Date.now() - start) * translationSpeed;
